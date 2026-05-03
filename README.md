@@ -24,7 +24,16 @@ Claim ──► DuckDuckGo Search ──► Chunker + Embedder
                         ClaimResult JSON (verdict + evidence)
 ```
 
-## What Works — M1
+## What Works — M2 (current)
+
+| Component | Status |
+|---|---|
+| `claimlens/retriever.py` | DuckDuckGo search — returns top-5 `{title, url, body}` dicts |
+| `claimlens/chunker.py` | Overlapping 200-word sliding-window chunker; propagates source URL |
+| `claimlens/embedder.py` | Ephemeral ChromaDB + `all-MiniLM-L6-v2` embeddings; `index_chunks()` + `query()` |
+| `tests/test_retrieval.py` | 8 unit tests covering chunker, retriever, and embedder roundtrip |
+
+### M1 — scaffolding
 
 | Component | Status |
 |---|---|
@@ -34,13 +43,28 @@ Claim ──► DuckDuckGo Search ──► Chunker + Embedder
 | `tests/__init__.py` | Test package initialized |
 | `LICENSE`, `.gitignore` | Present |
 
-The package installs cleanly and `python -m claimlens "any claim"` runs without error. No retrieval, embedding, or verification logic is wired yet.
-
 ## Quick Start
 
 ```bash
 pip install -r requirements.txt
 ```
+
+### Retrieval pipeline smoke test (M2)
+
+```python
+from claimlens.retriever import search
+from claimlens.chunker import chunk_results
+from claimlens.embedder import index_chunks, query
+
+results = search("Germany highest GDP EU 2023")
+chunks = chunk_results(results)
+col = index_chunks(chunks)
+hits = query(col, "Germany highest GDP EU 2023")
+print(hits[0])
+# {"text": "...", "url": "https://...", "title": "..."}
+```
+
+> **First run:** `index_chunks()` auto-downloads `all-MiniLM-L6-v2` (~90 MB). Subsequent calls reuse the cached singleton.
 
 **CLI** (coming in M5):
 ```bash
@@ -60,7 +84,8 @@ uvicorn claimlens.api:app --reload
 claimlens/
 ├── __init__.py        # package version  (M1)
 ├── __main__.py        # CLI entry-point stub  (M1)
-├── retriever.py       # DuckDuckGo search + chunking  (M2)
+├── retriever.py       # DuckDuckGo search  (M2)
+├── chunker.py         # overlapping sliding-window chunker  (M2)
 ├── embedder.py        # sentence-transformers + ChromaDB  (M2)
 ├── verifier.py        # LLM verification pass  (M3)
 ├── scorer.py          # label aggregation + confidence  (M4)
@@ -68,8 +93,9 @@ claimlens/
 └── api.py             # FastAPI /verify endpoint  (M5)
 tests/
 ├── __init__.py        (M1)
-├── test_scorer.py     (M4)
-└── test_verifier.py   (M3)
+├── test_retrieval.py  # chunker, retriever, embedder roundtrip — 8 tests  (M2)
+├── test_verifier.py   (M3)
+└── test_scorer.py     (M4)
 ```
 
 ## Environment Variables
