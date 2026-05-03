@@ -24,14 +24,19 @@ Claim ──► DuckDuckGo Search ──► Chunker + Embedder
                         ClaimResult JSON (verdict + evidence)
 ```
 
-## What Works — M2 (current)
+## What Works — M4 (current)
 
 | Component | Status |
 |---|---|
 | `claimlens/retriever.py` | DuckDuckGo search — returns top-5 `{title, url, body}` dicts |
 | `claimlens/chunker.py` | Overlapping 200-word sliding-window chunker; propagates source URL |
 | `claimlens/embedder.py` | Ephemeral ChromaDB + `all-MiniLM-L6-v2` embeddings; `index_chunks()` + `query()` |
+| `claimlens/models.py` | Pydantic schema — `Label`, `ClaimVerdict`, `ChunkVerdict`, `ClaimResult` |
+| `claimlens/verifier.py` | OpenAI GPT-4o-mini structured-output pass; labels each chunk SUPPORTS/REFUTES/NEUTRAL |
+| `claimlens/scorer.py` | Pure aggregation — confidence formula `(supports−refutes)/total` → [0,1]; resolves final verdict |
+| `claimlens/pipeline.py` | `pipeline.run(claim)` wires all stages end-to-end → `ClaimResult` |
 | `tests/test_retrieval.py` | 8 unit tests covering chunker, retriever, and embedder roundtrip |
+| `tests/test_scorer.py` | 6 pure unit tests for all scorer verdict branches and confidence formula |
 
 ### M1 — scaffolding
 
@@ -49,6 +54,24 @@ Claim ──► DuckDuckGo Search ──► Chunker + Embedder
 pip install -r requirements.txt
 ```
 
+### End-to-end pipeline (M4)
+
+```python
+import os
+os.environ["OPENAI_API_KEY"] = "sk-..."
+
+from claimlens.pipeline import run
+
+result = run("Germany had the highest GDP in the EU in 2023")
+print(result.verdict)       # SUPPORTED / REFUTED / INSUFFICIENT_EVIDENCE
+print(result.confidence)    # 0.0 – 1.0
+for ev in result.evidence:
+    print(ev.label, ev.source_url)
+    print(ev.chunk_text[:120])
+```
+
+> **First run:** `index_chunks()` auto-downloads `all-MiniLM-L6-v2` (~90 MB). Subsequent calls reuse the cached singleton.
+
 ### Retrieval pipeline smoke test (M2)
 
 ```python
@@ -63,8 +86,6 @@ hits = query(col, "Germany highest GDP EU 2023")
 print(hits[0])
 # {"text": "...", "url": "https://...", "title": "..."}
 ```
-
-> **First run:** `index_chunks()` auto-downloads `all-MiniLM-L6-v2` (~90 MB). Subsequent calls reuse the cached singleton.
 
 **CLI** (coming in M5):
 ```bash
@@ -88,14 +109,15 @@ claimlens/
 ├── chunker.py         # overlapping sliding-window chunker  (M2)
 ├── embedder.py        # sentence-transformers + ChromaDB  (M2)
 ├── verifier.py        # LLM verification pass  (M3)
+├── models.py          # Pydantic output schema  (M3)
 ├── scorer.py          # label aggregation + confidence  (M4)
-├── models.py          # Pydantic output models  (M3)
+├── pipeline.py        # end-to-end run(claim) orchestrator  (M4)
 └── api.py             # FastAPI /verify endpoint  (M5)
 tests/
 ├── __init__.py        (M1)
 ├── test_retrieval.py  # chunker, retriever, embedder roundtrip — 8 tests  (M2)
-├── test_verifier.py   (M3)
-└── test_scorer.py     (M4)
+├── test_scorer.py     # scorer verdict branches and confidence formula — 6 tests  (M4)
+└── test_verifier.py   # mock-based LLM verifier tests  (M5)
 ```
 
 ## Environment Variables
