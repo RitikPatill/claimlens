@@ -22,9 +22,12 @@ Claim ──► DuckDuckGo Search ──► Chunker + Embedder
                                        │
                                        ▼
                         ClaimResult JSON (verdict + evidence)
+                                       │
+                                       ▼
+                          FastAPI  /verify  ·  CLI (rich)
 ```
 
-## What Works — M4 (current)
+## What Works — M5 (current)
 
 | Component | Status |
 |---|---|
@@ -35,31 +38,36 @@ Claim ──► DuckDuckGo Search ──► Chunker + Embedder
 | `claimlens/verifier.py` | OpenAI GPT-4o-mini structured-output pass; labels each chunk SUPPORTS/REFUTES/NEUTRAL |
 | `claimlens/scorer.py` | Pure aggregation — confidence formula `(supports−refutes)/total` → [0,1]; resolves final verdict |
 | `claimlens/pipeline.py` | `pipeline.run(claim)` wires all stages end-to-end → `ClaimResult` |
+| `claimlens/api.py` | FastAPI `POST /verify` endpoint + `GET /health` |
+| `claimlens/__main__.py` | CLI — pretty-prints verdict, confidence, top-3 evidence chunks (rich) |
 | `tests/test_retrieval.py` | 8 unit tests covering chunker, retriever, and embedder roundtrip |
 | `tests/test_scorer.py` | 6 pure unit tests for all scorer verdict branches and confidence formula |
-
-### M1 — scaffolding
-
-| Component | Status |
-|---|---|
-| `claimlens/__init__.py` | Package created; `__version__ = "0.1.0"` |
-| `claimlens/__main__.py` | CLI stub — accepts a claim string, reports pipeline not yet implemented |
-| `requirements.txt` | All production and test dependencies pinned |
-| `tests/__init__.py` | Test package initialized |
-| `LICENSE`, `.gitignore` | Present |
+| `tests/test_api.py` | 5 unit tests for `/verify` endpoint (mocked pipeline, happy path + 502) |
 
 ## Quick Start
 
 ```bash
 pip install -r requirements.txt
+export OPENAI_API_KEY="sk-..."
 ```
 
-### End-to-end pipeline (M4)
+### API server
+
+```bash
+uvicorn claimlens.api:app --reload
+# POST http://localhost:8000/verify
+# Body: {"claim": "Germany had the highest GDP in the EU in 2023"}
+```
+
+### CLI
+
+```bash
+python -m claimlens "Germany had the highest GDP in the EU in 2023"
+```
+
+### Python API
 
 ```python
-import os
-os.environ["OPENAI_API_KEY"] = "sk-..."
-
 from claimlens.pipeline import run
 
 result = run("Germany had the highest GDP in the EU in 2023")
@@ -72,7 +80,7 @@ for ev in result.evidence:
 
 > **First run:** `index_chunks()` auto-downloads `all-MiniLM-L6-v2` (~90 MB). Subsequent calls reuse the cached singleton.
 
-### Retrieval pipeline smoke test (M2)
+### Retrieval pipeline smoke test
 
 ```python
 from claimlens.retriever import search
@@ -87,24 +95,12 @@ print(hits[0])
 # {"text": "...", "url": "https://...", "title": "..."}
 ```
 
-**CLI** (coming in M5):
-```bash
-python -m claimlens "Germany had the highest GDP in the EU in 2023"
-```
-
-**API** (coming in M5):
-```bash
-uvicorn claimlens.api:app --reload
-# POST http://localhost:8000/verify
-# Body: {"claim": "Germany had the highest GDP in the EU in 2023"}
-```
-
 ## Project Layout
 
 ```
 claimlens/
 ├── __init__.py        # package version  (M1)
-├── __main__.py        # CLI entry-point stub  (M1)
+├── __main__.py        # CLI — rich verdict + evidence table  (M5)
 ├── retriever.py       # DuckDuckGo search  (M2)
 ├── chunker.py         # overlapping sliding-window chunker  (M2)
 ├── embedder.py        # sentence-transformers + ChromaDB  (M2)
@@ -112,12 +108,13 @@ claimlens/
 ├── models.py          # Pydantic output schema  (M3)
 ├── scorer.py          # label aggregation + confidence  (M4)
 ├── pipeline.py        # end-to-end run(claim) orchestrator  (M4)
-└── api.py             # FastAPI /verify endpoint  (M5)
+└── api.py             # FastAPI /verify + /health endpoints  (M5)
 tests/
 ├── __init__.py        (M1)
 ├── test_retrieval.py  # chunker, retriever, embedder roundtrip — 8 tests  (M2)
 ├── test_scorer.py     # scorer verdict branches and confidence formula — 6 tests  (M4)
-└── test_verifier.py   # mock-based LLM verifier tests  (M5)
+├── test_api.py        # /verify endpoint — 5 tests with mocked pipeline  (M5)
+└── test_verifier.py   # mock-based LLM verifier tests  (M6 — planned)
 ```
 
 ## Environment Variables
@@ -135,6 +132,19 @@ Set one of the following before running M3+ features:
 ```bash
 pytest tests/
 ```
+
+14 tests pass with no network or model calls (all external I/O is mocked).
+
+## Roadmap
+
+| Milestone | Scope |
+|---|---|
+| M1 | Project scaffold, CLI stub, pinned dependencies |
+| M2 | Retrieval pipeline — search, chunker, embedder, ChromaDB |
+| M3 | LLM verification pass — structured output, Pydantic models |
+| M4 | Attribution scoring — confidence formula, verdict aggregation |
+| M5 | FastAPI endpoint, argparse CLI with rich output ← **current** |
+| M6 | Verifier unit tests, edge-case scorer coverage |
 
 ## License
 
