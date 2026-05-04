@@ -1,5 +1,9 @@
 # ClaimLens
 
+
+> **Video walkthrough:** https://youtu.be/F7in_X7VxH0
+> **60-second overview:** https://youtu.be/jS9ruO9IB7g
+
 > Verify any claim against live web evidence — local RAG pipeline with per-source attribution scores and verdict confidence.
 
 <!-- TODO: replace with a 5-10 second demo gif. Record with ScreenToGif on
