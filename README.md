@@ -61,25 +61,21 @@ for ev in result.evidence:
 ## Architecture
 
 ```
-Claim
-  │
-  ▼
-DuckDuckGo Search (top-5 results)
-  │
-  ▼
-Chunker (200-word overlapping windows) + Embedder (all-MiniLM-L6-v2)
-  │
-  ▼
-ChromaDB ephemeral vector store  ──►  top-k semantic retrieval
-  │
-  ▼
-LLM Verifier — GPT-4o-mini structured output (SUPPORTS / REFUTES / NEUTRAL per chunk)
-  │
-  ▼
-Scorer — confidence formula → final verdict  (ClaimResult JSON)
-  │
-  ├──► FastAPI  POST /verify
-  └──► CLI  python -m claimlens "..."
+Claim ──► DuckDuckGo Search ──► Chunker + Embedder (all-MiniLM-L6-v2)
+                                          │
+                                          ▼
+                                  ChromaDB (ephemeral)
+                                          │
+                                          ▼
+                               LLM Verifier (GPT-4o-mini)
+                               SUPPORTS / REFUTES / NEUTRAL per chunk
+                                          │
+                                          ▼
+                               Scorer → verdict + confidence
+                                          │
+                              ┌───────────┴───────────┐
+                              ▼                       ▼
+                        FastAPI /verify          CLI (rich)
 ```
 
 ## Project structure
