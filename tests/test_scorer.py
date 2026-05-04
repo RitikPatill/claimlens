@@ -63,3 +63,28 @@ def test_tie():
     verdict, confidence = score(verdicts)
     assert verdict == ClaimVerdict.INSUFFICIENT_EVIDENCE
     assert confidence == 0.5
+
+
+def test_single_supports_chunk():
+    # raw = (1-0)/1 = 1.0 → confidence = (1+1)/2 = 1.0
+    verdict, confidence = score([_make_verdict(Label.SUPPORTS)])
+    assert verdict == ClaimVerdict.SUPPORTED
+    assert confidence == 1.0
+
+
+def test_single_refutes_chunk():
+    # raw = (0-1)/1 = -1.0 → confidence = (-1+1)/2 = 0.0
+    verdict, confidence = score([_make_verdict(Label.REFUTES)])
+    assert verdict == ClaimVerdict.REFUTED
+    assert confidence == 0.0
+
+
+def test_refutes_win():
+    # 1 SUPPORTS, 3 REFUTES → raw = (1-3)/4 = -0.5 → confidence = (-0.5+1)/2 = 0.25
+    verdicts = (
+        [_make_verdict(Label.SUPPORTS)]
+        + [_make_verdict(Label.REFUTES)] * 3
+    )
+    verdict, confidence = score(verdicts)
+    assert verdict == ClaimVerdict.REFUTED
+    assert confidence == pytest.approx(0.25)
