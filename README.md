@@ -1,5 +1,9 @@
 # ClaimLens
 
+
+> **Video walkthrough:** https://youtu.be/F7in_X7VxH0
+> **60-second overview:** https://youtu.be/jS9ruO9IB7g
+
 > Verify any claim against live web evidence — local RAG pipeline with per-source attribution scores and verdict confidence.
 
 <!-- TODO: replace with a 5-10 second demo gif. Record with ScreenToGif on
@@ -61,25 +65,21 @@ for ev in result.evidence:
 ## Architecture
 
 ```
-Claim
-  │
-  ▼
-DuckDuckGo Search (top-5 results)
-  │
-  ▼
-Chunker (200-word overlapping windows) + Embedder (all-MiniLM-L6-v2)
-  │
-  ▼
-ChromaDB ephemeral vector store  ──►  top-k semantic retrieval
-  │
-  ▼
-LLM Verifier — GPT-4o-mini structured output (SUPPORTS / REFUTES / NEUTRAL per chunk)
-  │
-  ▼
-Scorer — confidence formula → final verdict  (ClaimResult JSON)
-  │
-  ├──► FastAPI  POST /verify
-  └──► CLI  python -m claimlens "..."
+Claim ──► DuckDuckGo Search ──► Chunker + Embedder (all-MiniLM-L6-v2)
+                                          │
+                                          ▼
+                                  ChromaDB (ephemeral)
+                                          │
+                                          ▼
+                               LLM Verifier (GPT-4o-mini)
+                               SUPPORTS / REFUTES / NEUTRAL per chunk
+                                          │
+                                          ▼
+                               Scorer → verdict + confidence
+                                          │
+                              ┌───────────┴───────────┐
+                              ▼                       ▼
+                        FastAPI /verify          CLI (rich)
 ```
 
 ## Project structure
